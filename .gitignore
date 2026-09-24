@@ -1,0 +1,13 @@
+data/
+models/
+*.gguf
+*.safetensors
+teacher-env.sh
+__pycache__/
+.hf/
+results/*/raw-*/
+results/*.log
+results/dashboard-history.json
+runpod-env.sh
+h100-env.sh
+bench/out/
