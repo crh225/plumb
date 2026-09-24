@@ -1,0 +1,7 @@
+run                   tier          n     acc     ece   p50 ms  invalid
+jevk5-bf16            easy         48   1.000   0.039       27        0
+jevk5-bf16            standard     72   0.972   0.137       28        0
+jevk5-bf16            hard        111   0.739   0.077       79        0
+jevy-v4               easy         48   1.000   0.044       28        0
+jevy-v4               standard     72   0.972   0.139       28        0
+jevy-v4               hard        111   0.775   0.051       79        0

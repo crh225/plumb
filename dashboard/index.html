@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jevy run</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --ink: #1b1d22; --muted: #6b6f78; --line: #e4e2dc;
+  --accent: #3b6df0; --accent-soft: #e6ecfd; --good: #1f9d63; --warn: #c98a12; --bad: #d1453b;
+  --target: #b04ad6; --bar: #edebe6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111317; --panel: #181b21; --ink: #e8e9ec; --muted: #8b909b; --line: #262a32;
+    --accent: #7c9cff; --accent-soft: #1e2740; --good: #3ecf8e; --warn: #f0b43c; --bad: #ff6b5e;
+    --target: #d58cf0; --bar: #22262e;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111317; --panel: #181b21; --ink: #e8e9ec; --muted: #8b909b; --line: #262a32;
+  --accent: #7c9cff; --accent-soft: #1e2740; --good: #3ecf8e; --warn: #f0b43c; --bad: #ff6b5e;
+  --target: #d58cf0; --bar: #22262e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 Inter, system-ui, sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 22px 16px 60px; }
+.mono, .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; margin-bottom: 18px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; }
+h1 span { color: var(--muted); font-weight: 500; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 99px;
+  background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 13px; }
+.pill.done { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.pill.fail { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.clock { margin-left: auto; color: var(--muted); font-size: 13px; }
+.clock b { color: var(--ink); font-size: 18px; margin-left: 6px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(12, 1fr); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; min-width: 0; }
+.card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px; }
+.s12 { grid-column: span 12; } .s8 { grid-column: span 8; } .s7 { grid-column: span 7; } .s6 { grid-column: span 6; }
+.s5 { grid-column: span 5; } .s4 { grid-column: span 4; } .s3 { grid-column: span 3; }
+@media (max-width: 1100px) { .s3 { grid-column: span 6; } }
+@media (max-width: 900px) { .s8, .s7, .s6, .s5, .s4, .s3 { grid-column: span 12; } }
+.hero { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: flex-end; }
+.big { font-size: 46px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.big small { font-size: 18px; color: var(--muted); font-weight: 500; }
+.kv { display: flex; flex-direction: column; gap: 2px; }
+.kv .k { color: var(--muted); font-size: 12px; }
+.kv .v { font-size: 17px; font-weight: 600; }
+.track { height: 10px; border-radius: 99px; background: var(--bar); overflow: hidden; margin: 14px 0 6px; position: relative; }
+.fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .6s; }
+.sub { color: var(--muted); font-size: 12.5px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.dot.on { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.dot.off { background: var(--bad); }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+.stats .v { font-size: 20px; }
+.errs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { font-size: 11.5px; padding: 2px 8px; border-radius: 6px; background: var(--bar); color: var(--muted); }
+.tag.bad { color: var(--bad); }
+.steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.step { font-size: 12px; padding: 4px 10px; border-radius: 8px; background: var(--bar); color: var(--muted); }
+.step.now { background: var(--accent); color: #fff; }
+.step.past { color: var(--good); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+td.win { color: var(--good); font-weight: 600; } td.lose { color: var(--bad); }
+.hbar { display: grid; grid-template-columns: 130px 1fr 44px; gap: 10px; align-items: center; margin: 7px 0; font-size: 13px; }
+.hbar .t { height: 8px; background: var(--bar); border-radius: 99px; overflow: hidden; }
+.hbar .t i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.q { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.q:last-child { border-bottom: 0; }
+.q .meta { font-size: 11.5px; color: var(--muted); margin-bottom: 3px; }
+.q .ans { font-size: 12px; color: var(--good); margin-top: 3px; }
+pre.log { margin: 0; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: var(--muted); max-height: 280px; overflow: auto; }
+pre.log b { color: var(--ink); font-weight: 500; }
+svg { display: block; width: 100%; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
+.stale { color: var(--warn); }
+.tgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.next { margin-top: 8px; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; }
+.next .sub { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>jevy <span>vs JevK5 on JevBench</span></h1>
+    <span id="phase" class="pill"><span class="pulse"></span>connecting</span>
+    <div class="clock">run ends in<b id="countdown" class="num">--</b></div>
+  </header>
+
+  <div class="grid">
+    <section class="card s8">
+      <h2>Teacher questions kept (both solves agreed)</h2>
+      <div class="hero">
+        <div class="big num" id="kept">--<small id="target"></small></div>
+        <div class="kv"><span class="k">last hour</span><span class="v num" id="rate">--</span></div>
+        <div class="kv"><span class="k">next round</span><span class="v" id="trigger">--</span></div>
+        <div class="kv"><span class="k">JevK5 trained on</span><span class="v num">3,272</span></div>
+      </div>
+      <div class="track"><div class="fill" id="bar" style="width:0"></div></div>
+      <div class="sub" id="barnote"></div>
+      <div id="chart" style="margin-top:14px"></div>
+    </section>
+
+    <section class="card s4">
+      <h2>GPU</h2>
+      <div id="gpu"></div>
+    </section>
+
+    <div class="s12 tgrid" id="teacher-cards"></div>
+
+    <section class="card s7">
+      <h2>Training round</h2>
+      <div id="round"></div>
+    </section>
+
+    <section class="card s5">
+      <h2>Public JevBench items (231)</h2>
+      <div id="scores"></div>
+    </section>
+
+    <section class="card s5">
+      <h2>Kept questions by family</h2>
+      <div id="families"></div>
+    </section>
+
+    <section class="card s7">
+      <h2>Latest kept questions</h2>
+      <div id="recent"></div>
+    </section>
+
+    <section class="card s12">
+      <h2>Supervisor log</h2>
+      <pre class="log" id="log"></pre>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const fmt = (n, d = 0) => n == null || isNaN(n) ? "--" : Number(n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const ROUND_COST = 40 * 60e3, ROUND_SLACK = 10 * 60e3;
+const FAMILY_WEIGHT = { temporal_numeric: 3, long_policy: 3, multi_hop: 2, judge: 2, ambiguous: 2, probability: 2 };
+let S = null;
+
+function dur(ms) {
+  if (ms <= 0) return "0:00";
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${m}:${String(x).padStart(2, "0")}`;
+}
+
+function lineChart(points, { h = 120, target } = {}) {
+  if (points.length < 2) return `<div class="empty">The chart fills in as the dashboard samples (once a minute).</div>`;
+  const W = 700, pad = 4, t0 = points[0][0], t1 = points[points.length - 1][0];
+  const ys = points.map((p) => p[1]);
+  const lo = Math.min(...ys), hi = Math.max(target || 0, ...ys);
+  const x = (t) => pad + ((t - t0) / Math.max(1, t1 - t0)) * (W - 2 * pad);
+  const y = (v) => h - pad - ((v - lo) / Math.max(1, hi - lo)) * (h - 2 * pad - 14);
+  const d = points.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join("");
+  const area = `${d}L${x(t1)},${h - pad}L${x(t0)},${h - pad}Z`;
+  const tl = target && target <= hi ? `<line x1="${pad}" x2="${W - pad}" y1="${y(target)}" y2="${y(target)}" stroke="var(--target)" stroke-dasharray="4 4"/>
+    <text x="${W - pad}" y="${y(target) - 5}" text-anchor="end" fill="var(--target)" font-size="11">round at ${target}</text>` : "";
+  return `<svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="height:${h}px">
+    <path d="${area}" fill="var(--accent-soft)"/><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>${tl}
+  </svg><div class="legend"><span>${clock(t0)}</span><span style="margin-left:auto">${clock(t1)}</span></div>`;
+}
+
+function spark(vals, h = 46) {
+  if (vals.length < 2) return "";
+  const W = 300, lo = Math.min(...vals), hi = Math.max(...vals);
+  const d = vals.map((v, i) => `${i ? "L" : "M"}${(i / (vals.length - 1)) * W},${h - 3 - ((v - lo) / Math.max(1e-9, hi - lo)) * (h - 6)}`).join("");
+  return `<svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="height:${h}px"><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+function nextDocLine(src, running) {
+  const e = S.etas?.[src];
+  if (!running || !e) return "";
+  const ms = e.at - Date.now();
+  const when = ms > 0 ? `in <b class="num">${dur(ms)}</b>` : ms > -10 * 60e3 ? "<b>any moment</b>" : `<b>late</b> by ${dur(-ms)}`;
+  return `<div class="next">next document ${when}<span class="sub"> · ${esc(e.basis)}</span></div>`;
+}
+
+function teacherCard(label, src, running, rate, extra) {
+  const t = S.teachers[src];
+  if (!t) return `<h2><span class="dot ${running ? "on" : ""}"></span>${label}</h2><div class="empty">No documents yet.</div>${nextDocLine(src, running)}${extra || ""}`;
+  const keepRate = t.questions ? t.kept / t.questions : 0;
+  const errs = Object.entries(t.errors).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    .map(([k, n]) => `<span class="tag ${/403|429|5\d\d/.test(k) ? "bad" : ""}">${esc(k)} <b class="num">${n}</b></span>`).join("");
+  return `<h2><span class="dot ${running ? "on" : "off"}"></span>${label}<span style="margin-left:auto;text-transform:none;letter-spacing:0">${running ? "writing" : "stopped"}</span></h2>
+    <div class="stats">
+      <div class="kv"><span class="k">kept</span><span class="v num">${fmt(t.kept)}</span></div>
+      <div class="kv"><span class="k">per hour</span><span class="v num">${rate == null ? "--" : fmt(rate, 1)}</span></div>
+      <div class="kv"><span class="k">keep rate</span><span class="v num">${fmt(keepRate * 100)}%</span></div>
+      <div class="kv"><span class="k">tokens / kept</span><span class="v num">${t.kept ? fmt(t.tokens / t.kept) : "--"}</span></div>
+    </div>
+    <div class="sub">${fmt(t.docs)} documents, ${fmt(t.questions)} questions answered twice</div>
+    ${nextDocLine(src, running)}
+    ${extra || ""}
+    ${errs ? `<div class="errs">${errs}</div>` : ""}`;
+}
+
+function render() {
+  if (!S) return;
+  const sup = S.supervisor, now = Date.now(), r = sup.round;
+  const p = S.probes.processes || {};
+
+  // header
+  const left = sup.deadline ? sup.deadline - now : null;
+  $("countdown").textContent = sup.finished ? "finished" : left == null ? "--" : dur(left);
+  let phase = "Collecting teacher data", cls = "";
+  if (sup.finished) { phase = "Run finished"; cls = "done"; }
+  else if (!p.supervisor && S.probes.at) { phase = "Supervisor not running"; cls = "fail"; }
+  else if (r && !r.done) phase = `Round ${r.name}: ${r.step}`;
+  $("phase").className = `pill ${cls}`;
+  $("phase").innerHTML = `${cls ? "" : '<span class="pulse"></span>'}${esc(phase)}`;
+
+  // hero
+  $("kept").innerHTML = sup.target > 20000 ? `${fmt(S.total)}` : `${fmt(S.total)}<small> / ${fmt(sup.target)}</small>`;
+  $("rate").textContent = S.rate == null ? "measuring" : `${fmt(S.rate, 1)} / h`;
+  const trigAt = sup.deadline ? sup.deadline - ROUND_COST - ROUND_SLACK : null;
+  const need = Math.max(0, sup.target - S.total);
+  const etaTarget = S.rate > 0 ? now + (need / S.rate) * 3600e3 : null;
+  let trig = "--";
+  if (sup.finished) trig = "none";
+  else if (r && !r.done) trig = "running now";
+  else if (trigAt) trig = etaTarget && etaTarget < trigAt ? `~${clock(etaTarget)} (at ${sup.target})` : `${clock(trigAt)} (time)`;
+  $("trigger").textContent = trig;
+  $("bar").style.width = sup.target > 20000 && sup.deadline ? `${Math.min(100, Math.max(0, (now - sup.start) / (sup.deadline - ROUND_COST - ROUND_SLACK - sup.start)) * 100)}%` : `${Math.min(100, (S.total / Math.max(1, sup.target)) * 100)}%`;
+  $("barnote").textContent = sup.finished ? "The run has ended; teachers are stopped."
+    : sup.target > 20000 ? `The next round starts on the clock, 50 minutes before the run ends; the bar is time until then.` : `${fmt(need)} to go. A round starts at ${fmt(sup.target)} or when only a round's worth of time is left, whichever comes first.`;
+  $("chart").innerHTML = lineChart(S.history, { target: sup.target > 20000 ? null : sup.target });
+
+  // teachers
+  const slots = (S.probes.slots || []).map((s) => `<span class="tag">slot ${s.id}: <b class="num">${fmt(s.tps, 1)}</b> tok/s</span>`).join("");
+  // One card per teacher: the shared remote server, the local build while it runs, and every rented pod.
+  const podNote = (n) => n <= 4 ? "$1.69/h community" : "$2.09/h secure";
+  const cards = [];
+  for (const { file, label } of S.teacherList || []) {
+    const running = !!p.byFile?.[file];
+    const pod = label.match(/^Runpod 27B(?: #(\d+))?$/);
+    if (label === "Smoke test" || (label === "Local 27B" && !running)) continue;
+    let title = label, note = "";
+    if (label === "Remote 27B") {
+      title = "Remote 27B (shared server)";
+      note = running ? "Shared server, full recipe with thinking." : "Off: the shared server stopped answering at 12:16.";
+    } else if (label === "Local 27B") {
+      title = "Local 27B (4080 Super)";
+      note = `Two streams, Q3 quantization.${slots ? `</div><div class="errs">${slots}` : ""}`;
+    } else if (pod) {
+      const n = +(pod[1] || 1);
+      title = `Runpod #${n} (RTX PRO 6000)`;
+      note = `${podNote(n)}, 48 streams${n === 3 ? ", specialist mix" : ""}. Stops at 4,000 kept or 3:30 PM.`;
+    }
+    cards.push(`<section class="card">${teacherCard(title, label, running, S.perSource[label],
+      `<div class="sub" style="margin-top:4px">${note}</div>`)}</section>`);
+  }
+  const anyRunning = (S.teacherList || []).some(({ file }) => p.byFile?.[file]);
+  $("teacher-cards").innerHTML = anyRunning ? cards.join("")
+    : `<section class="card"><h2>Teachers</h2><div class="sub">None running. Data collection is finished: <b class="num">${fmt(S.total)}</b> kept teacher questions.</div></section>`;
+
+  // gpu
+  const g = S.probes.gpu;
+  $("gpu").innerHTML = !g ? `<div class="empty">nvidia-smi not answering.</div>` : `
+    <div class="stats" style="grid-template-columns:repeat(2,1fr)">
+      <div class="kv"><span class="k">utilization</span><span class="v num">${g.util}%</span></div>
+      <div class="kv"><span class="k">temperature</span><span class="v num">${g.temp}°C</span></div>
+      <div class="kv"><span class="k">power</span><span class="v num">${fmt(g.watts)} W</span></div>
+      <div class="kv"><span class="k">memory</span><span class="v num">${fmt(g.used / 1024, 1)} / ${fmt(g.total / 1024)} GB</span></div>
+    </div>
+    <div class="track"><div class="fill" style="width:${(g.used / g.total) * 100}%"></div></div>
+    <div class="sub">${esc(g.name)}. ${p.container ? "Training container is running." : S.probes.server ? "Serving the local teacher." : "Idle."}</div>`;
+
+  // round
+  const STEPS = ["building", "overlap scan", "hard mining", "training", "calibrating", "public benchmark", "pushed"];
+  if (!r) {
+    $("round").innerHTML = `<div class="steps">${STEPS.map((s) => `<span class="step">${s}</span>`).join("")}</div>
+      <div class="empty">Next: <b>${esc(sup.nextRound)}</b>${trigAt && sup.target > 20000 ? ` at ${clock(trigAt)}` : ""}. It trains from JevK5 on every kept teacher question (${fmt(S.total)} so far) plus as many plain replay items, 2 epochs at lr 2e-5, then calibrates on held-out teacher questions and runs the public 231.</div>`;
+  } else {
+    const idx = r.done && !r.failed ? STEPS.length - 1 : STEPS.findIndex((s) => r.step.startsWith(s.split(" ")[0]));
+    const steps = STEPS.map((s, i) => `<span class="step ${i < idx ? "past" : i === idx ? "now" : ""}">${s}</span>`).join("");
+    let body = `<div class="sub" style="margin-bottom:10px">${esc(r.name)} on ${fmt(r.kept)} teacher questions${r.failed ? ' <b style="color:var(--bad)">failed; see results/' + esc(r.name) + '-train.log</b>' : ""}</div>`;
+    if (r.train) {
+      body += `<div class="hero"><div class="kv"><span class="k">step</span><span class="v num">${r.train.step} / ${r.train.of}</span></div>
+        <div class="kv"><span class="k">loss</span><span class="v num">${fmt(r.train.loss, 3)}</span></div>
+        <div class="kv"><span class="k">left</span><span class="v num">~${r.train.minLeft} min</span></div></div>
+        <div class="track"><div class="fill" style="width:${(r.train.step / r.train.of) * 100}%"></div></div>${spark(r.train.losses)}`;
+    }
+    if (r.before) body += `<div class="sub" style="margin-top:8px">held-out dev before: acc <b class="num">${fmt(r.before.acc, 3)}</b>, ECE <b class="num">${fmt(r.before.ece, 3)}</b>${r.after ? `; after: acc <b class="num">${fmt(r.after.acc, 3)}</b>, ECE <b class="num">${fmt(r.after.ece, 3)}</b>` : ""}</div>`;
+    if (r.passes?.length) {
+      const best = r.passes.reduce((a, p) => (p.acc > a.acc || (p.acc === a.acc && p.nll < a.nll) ? p : a));
+      body += `<div class="sub" style="margin-top:10px">held-out check after each pass${r.kept_pass ? ` (kept pass ${r.kept_pass})` : ""}:</div>
+        <table style="margin-top:4px"><tr><th>pass</th><th>accuracy</th><th>NLL</th><th>ECE</th></tr>${r.passes.map((p) =>
+          `<tr><td>${p === best ? "<b>" + p.pass + "</b>" : p.pass}</td><td class="num">${fmt(p.acc, 4)}</td><td class="num">${fmt(p.nll, 3)}</td><td class="num">${fmt(p.ece, 3)}</td></tr>`).join("")}</table>`;
+    }
+    if (r.temperature) body += `<div class="sub">calibration temperature <b class="num">${r.temperature}</b> (JevK5: 1.532)</div>`;
+    if (r.bench) body += `<div class="sub">benchmark: ${r.bench.splitsDone} of 3 splits done${r.bench.current ? `, current ${r.bench.current}` : ""}</div>`;
+    $("round").innerHTML = `<div class="steps">${steps}</div>${body}`;
+  }
+
+  // experiment rounds in this run: held-out check first, since that is what picks the winner
+  if ((sup.rounds || []).some((x) => x.what)) {
+    const rows = sup.rounds.map((x) => `<tr><td>${esc(x.name)}</td><td style="text-align:left">${esc(x.what)}</td>
+      <td class="num">${x.after == null ? (x.failed ? "failed" : "…") : fmt(x.after, 4)}</td><td class="num">${x.kept ?? "–"}</td>
+      <td class="num">${x.hard == null ? "–" : fmt(x.hard, 3)}</td><td class="num">${x.hardEce == null ? "–" : fmt(x.hardEce, 3)}</td></tr>`).join("");
+    $("round").innerHTML += `<div class="sub" style="margin-top:14px">This run's experiments (v5 for reference: held-out 0.8455, hard 0.802, ECE 0.094):</div>
+      <table style="margin-top:4px"><tr><th>run</th><th style="text-align:left">recipe</th><th>held-out</th><th>pass</th><th>hard</th><th>hard ECE</th></tr>${rows}</table>`;
+  }
+
+  // scores
+  const runs = S.scores, names = Object.keys(runs).sort((a, b) => (a === "jevk5-bf16" ? -1 : b === "jevk5-bf16" ? 1 : a.localeCompare(b)));
+  const base = runs["jevk5-bf16"] || {};
+  const cell = (run, tier) => {
+    const v = runs[run][tier]; if (!v) return "<td>--</td>";
+    const b = base[tier], c = run === "jevk5-bf16" || !b ? "" : v.acc > b.acc ? "win" : v.acc < b.acc ? "lose" : "";
+    return `<td class="num ${c}">${v.acc.toFixed(3)}<div class="sub num">ECE ${v.ece.toFixed(3)}</div></td>`;
+  };
+  $("scores").innerHTML = names.length ? `<table><tr><th>model</th><th>easy</th><th>standard</th><th>hard</th></tr>
+    ${names.map((n) => `<tr><td>${n === "jevk5-bf16" ? "<b>JevK5 v0.2</b>" : esc(n)}</td>${cell(n, "easy")}${cell(n, "standard")}${cell(n, "hard")}</tr>`).join("")}</table>
+    <div class="sub" style="margin-top:10px">Same harness and GPU for every row. Green beats JevK5; the hard tier (111 items) is the one that decides it. The official score also uses a private sealed set.</div>`
+    : `<div class="empty">No scores yet.</div>`;
+
+  // families
+  const fam = {};
+  for (const t of Object.values(S.teachers)) for (const [k, n] of Object.entries(t.families)) fam[k] = (fam[k] || 0) + n;
+  const fmax = Math.max(1, ...Object.values(fam));
+  $("families").innerHTML = Object.entries(fam).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+    `<div class="hbar"><span>${esc(k.replace("_", " "))}${FAMILY_WEIGHT[k] ? ` <span class="sub">×${FAMILY_WEIGHT[k]}</span>` : ""}</span><span class="t"><i style="width:${(n / fmax) * 100}%"></i></span><span class="num" style="text-align:right">${n}</span></div>`).join("")
+    + `<div class="sub" style="margin-top:8px">×N marks families weighted up because JevK5 is weakest there.</div>`;
+
+  // recent
+  const recent = ["Runpod 27B", "Runpod 27B #2", "Remote 27B"].flatMap((k) => (S.teachers[k]?.recent || []).slice(-3).reverse());
+  $("recent").innerHTML = recent.length ? recent.map((q) => `<div class="q"><div class="meta">${esc(q.source)} · ${esc(q.family.replace("_", " "))} · ${esc(q.domain)} · ${esc(q.type)}, ${q.options} options</div>
+    <div>${esc(q.q)}</div><div class="ans mono">→ ${esc(q.answer)}</div></div>`).join("") : `<div class="empty">None yet.</div>`;
+
+  // log
+  $("log").innerHTML = sup.tail.map((l) => esc(l).replace(/^(\S+ \S+)/, "<b>$1</b>")).join("\n") || "No supervisor log yet.";
+}
+
+async function poll() {
+  try {
+    const res = await fetch("/api/status", { cache: "no-store" });
+    S = await res.json();
+    render();
+  } catch {
+    $("phase").className = "pill fail";
+    $("phase").textContent = "dashboard server unreachable";
+  }
+}
+poll();
+setInterval(poll, 10000);
+setInterval(render, 1000);
+</script>
+</body>
+</html>
