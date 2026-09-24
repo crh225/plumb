@@ -1,100 +1,103 @@
 # jevy
 
-An open, one-pass typed-decision model trained to beat
-[JevK5](https://github.com/allebee/jevk5) on [JevBench](https://github.com/fstandhartinger/jevbench).
+The training pipeline behind **Plumb-4B**: an open, one-pass typed-decision model trained to beat [JevK5](https://github.com/allebee/jevk5)
+on [JevBench](https://github.com/fstandhartinger/jevbench).
 
-JevK5 v0.2 is JevBench's best open entrant: #2 of 76 on v1.4 (62.04, against Jev 1.13.0's 63.29).
-It is Qwen3.5-4B with a LoRA distilled from Qwen3.6-27B, read out in one forward pass as a softmax
-over the answer letters' logits. jevy uses the same shape (so the same speed and cost) and aims
-to win on intelligence and calibration with a stronger teacher and more, broader data.
+Give it evidence, a question and 2-16 options; it returns a calibrated probability for every option
+from one forward pass, with no generated tokens. It is Qwen3.5-4B continued from JevK5 v0.2, so it
+has the same size, speed, cost and file format, and runs through JevK5's runtime and JevBench adapter
+unchanged. Any difference is quality.
 
-## The target (JevBench v1.2 public items, JevK5 v0.2, its own published run)
+## Results so far
 
-| Split | n | JevK5 v0.2 |
-|---|---:|---:|
-| easy | 48 | 1.000 |
-| original (standard) | 72 | 0.958 |
-| hard (public half) | 111 | 0.739 |
-| hard-tier ECE | | 0.066 |
+JevBench's own runner on the 231 public items, one RTX 4080 Super, in-process, batch 1. JevK5 v0.2
+was re-run on the same machine as the baseline.
 
-The official score also needs JevBench's private sealed set, which only its maintainer runs.
+| Model | Teacher questions | Easy | Standard | Hard | Hard ECE | Held-out check |
+|---|---:|---:|---:|---:|---:|---:|
+| JevK5 v0.2 (baseline) | 3,272 (its own) | 1.000 | 0.972 | 0.739 | 0.077 | 0.812 |
+| v1 | 0 (public datasets only) | 1.000 | 0.972 | 0.694 | 0.095 | |
+| v2 | 495 | 1.000 | 0.972 | 0.757 | 0.034 | 0.824 |
+| v3 | 909 | 1.000 | 0.972 | 0.739 | 0.070 | 0.834 |
 
-## Rules we hold to
+The held-out check is our own: teacher questions from domains training never sees, held-out splits
+of the public datasets, and a hand-written hard set. Models are chosen on it, never on JevBench.
 
-- **No JevBench item is trained on, tuned on, or used to pick a checkpoint.** The 231 public
-  items are only a scoreboard at the end of a run. Checkpoints and the calibration temperature
-  are chosen on our own held-out data (teacher questions from domains training never sees, plus
-  held-out splits of the replay datasets).
-- **Same readout and size as JevK5**, so speed and cost stay level and any gain is quality.
+So far the held-out check improves steadily, but the public hard tier barely moves: v2's lead over
+JevK5 is two items of 111, and v3 matches it exactly. Per family, dates and numbers, long policies,
+judging and probability are identical for all three. The rounds in progress test two reasons for
+that (see Log): training that is too gentle on questions JevK5 already answers, and documents much
+shorter than JevBench's.
 
-## Pipeline
+The official JevBench score also includes a private sealed set that only its maintainer runs.
 
-1. `training/teacher.py` (from JevK5, Apache-2.0): a teacher writes realistic documents with
-   hard typed questions and answers each twice with thinking; only questions both answers agree
-   on are kept. Our teacher is Qwen3.8-27B (on a shared remote server and rented GPUs), a newer model than JevK5's
-   Qwen3.6-27B. Changes: extra request headers and streamed responses, for a gateway behind a
-   proxy that drops silent requests after ~100 s.
-2. `training/build_replay.py` (new): human-labelled public datasets (MNLI, WANLI, BoolQ,
-   banking77, ARC, CommonsenseQA, MMLU-Pro) in the decision format, so easy decisions don't regress.
-3. `training/build_train.py` and `training/lora.py` (from JevK5): assemble the training set and
-   LoRA-tune Qwen3.5-4B with cross-entropy on the option-letter logits; merge the adapter.
-4. Calibrate one temperature on held-out teacher questions; evaluate on the public 231.
+## Rules
 
-Training and evaluation run in the `Dockerfile` image (PyTorch 2.14, CUDA 13) on an RTX 4080
-Super (16 GB). `teacher-env.sh` (git-ignored) points the teacher at its server.
+- **No JevBench item, public or held out, is trained on, tuned on, or used to pick a model or a
+  temperature.** The public items are a scoreboard at the end of a round.
+- Every training set is scanned against the 231 public items before training
+  (`training/scan_overlap.py`): items sharing more than two 8-word sequences are dropped. The hits
+  are generic phrases such as "the action of the highest ranked applicable rule".
+- An exact normalised-text audit (`training/audit_exact.py`) finds no training state or instruction
+  equal to, or containing, a public one (12,143 records checked).
+
+## How it is trained
+
+1. **Teacher** (`training/teacher.py`, from JevK5): Qwen3.8-27B writes realistic documents with hard
+   typed questions (true/false, choice, ordinal score) and answers each twice with thinking; a
+   question is kept only when both answers match the intended one. Families are JevBench's published
+   categories, weighted toward JevK5's weak spots. Served with vLLM (FP8) on rented GPUs; a local
+   llama.cpp build (`serve-teacher.sh`) and a shared remote server were used early on.
+2. **Replay** (`training/build_replay.py`): human-labelled public datasets (MNLI, WANLI, BoolQ,
+   banking77, ARC, CommonsenseQA, MMLU-Pro) in the same format, as many items as teacher questions,
+   so easy decisions don't regress.
+3. **Round** (`cycle.sh`): assemble the set (`training/build_gate.py`), scan it, optionally keep only
+   the teacher questions JevK5 gets wrong or is unsure of (`training/mine_hard.py`), LoRA-train from
+   JevK5 with cross-entropy on the option-letter logits (`training/lora.py`), fit one temperature on
+   held-out teacher questions (`training/fit_temperature.py`), and run the public items
+   (`run-bench.sh`). `round.conf` holds the current recipe.
+4. **Unattended runs** (`supervise.sh`): keep the teachers writing, start rounds on a question count
+   or a clock, push each round's scores. `dashboard/` shows it live.
+
+Training and evaluation run in the `Dockerfile` image (PyTorch 2.14, CUDA 13) on a 16 GB GPU.
+Teacher endpoints and keys live in git-ignored `*-env.sh` files.
+
+## Submitting to JevBench
+
+`bench/stats.py results/jevy-<round>` computes the numbers a submission needs (per-tier accuracy,
+calibration, latency, input tokens, fixes and breaks against JevK5 with an exact McNemar test).
+`bench/make_card.py <round>` then writes the system card, the Hugging Face model card and the
+`[bench request]` issue text from that round's own files.
 
 ## Log
 
-**Baseline (reproduced here).** JevK5 v0.2 bf16 on the 231 public items, JevBench's own runner,
-RTX 4080 Super: easy 1.000 (ECE 0.039), standard 0.972 (0.137), hard 0.739 (0.077), 27-79 ms.
-`results/jevk5-bf16/`.
+**Baseline.** JevK5 v0.2 reproduced on the 4080 Super: easy 1.000, standard 0.972, hard 0.739.
 
-**Teacher capacity.** The teacher server takes 1-2 concurrent requests (8 at once all fail) and
-sits behind Cloudflare, whose ~100 s cut-off kills queued requests (fixed by streaming) and whose
-bot protection later started refusing the Python and Node clients with 403. We don't disguise
-traffic to get past bot protection; the route needs an exception or a direct address from the
-server's owner. At 1-2 requests the teacher yields ~25-50 kept questions an hour.
+**v1: public datasets alone make it worse.** Continued from JevK5 on public datasets aimed at its
+weak families (ContractNLI, ANLI, TabFact, QuALITY, AQuA-RAT, date understanding): hard 0.694. They
+pull the model toward their own short styles. Teacher-written documents are what matter.
 
-**Teacher-free hard data.** While the teacher is limited, `build_hard_replay.py` turns public,
-human-labelled datasets into decisions aimed at JevK5's weakest families: ContractNLI (long
-policies, "not mentioned"), ANLI (traps), TabFact (table lookups), QuALITY (long reading),
-AQuA-RAT (arithmetic) and BIG-Bench Hard date understanding. The overlap scan finds only generic
-legal boilerplate shared with one public item.
+**Teachers.** A shared remote server gave ~10 kept questions an hour, a local 3-bit build ~50. Rented
+RTX PRO 6000 pods running vLLM with 48 streams give ~270-300 each, about $0.006 per kept question.
+Two parser fixes mattered: a failed planning pass now retries without thinking, and probability
+documents written with fractions (`1/15`) now parse, which took probability from 16 kept questions
+to 170.
 
-**Teacher family mix.** Teacher documents are weighted toward JevK5's weakest hard-tier families
-(its own README: dates and numbers 0.47, long policies 0.58, judging 0.76, multi-step 0.78) and
-toward probability, which JevK5 barely trained on. Families are JevBench's published categories,
-not its items.
+**v2 and v3: more of the same data doesn't reach the hard items.** Both train from JevK5 for 2 epochs
+at lr 2e-5. The held-out check rises (0.812, 0.824, 0.834), but the public hard tier stays at
+0.739-0.757 and its families don't move.
 
-**v1: public hard data alone makes it worse.** Continued from JevK5 on 5,000 replay + 6,663
-hard-replay items (one epoch, lr 2e-5), temperature 1.41 fitted on dev. Dev accuracy rose 0.716 ->
-0.754, but only on the sources it trained on; the hand-written hard set stayed 50/65. JevBench
-public: easy 1.000 (ECE 0.027), standard 0.972 (0.144), **hard 0.694** against JevK5's 0.739. The
-public datasets pull it toward their own styles (short NLI, tables, arithmetic) and away from long,
-trap-laden documents. Discarded; teacher-written documents are what matter.
-
-**Local teacher.** Qwen3.8-27B (the same model as the remote teacher) in Unsloth's UD-Q3_K_XL
-quantization, 13.1 GB, fully on the 4080 Super under llama.cpp (`serve-teacher.sh`): 41 tok/s
-for one request, 73 tok/s for two, and no proxy in the way.
-
-**Rented teachers.** Two RTX PRO 6000 pods on Runpod ($1.69/h each) serve Qwen3.8-27B-FP8 in
-vLLM with 48 streams each: ~250-320 kept questions an hour per pod (about $0.007 per kept
-question), against ~9/h from the shared remote teacher and ~50/h from the local Q3 build.
-Probability documents are dropped on the pods (exact distributions almost never survive two
-solves), and the planning pass gets 24k tokens (date documents ran out of room at 14k).
-
-**v2: first win over JevK5.** Continued from JevK5 on 495 kept teacher questions + as many plain
-replay items, 2 epochs, lr 2e-5; temperature 1.47 fitted on 131 held-out teacher questions.
-Held-out dev 0.812 -> 0.824 (teacher questions 0.802 -> 0.840; hand-written hard unchanged at
-51/65). JevBench public: easy 1.000 (ECE 0.038), standard 0.972 (0.141), **hard 0.757 (ECE
-0.034)** against JevK5's 0.739 (0.077). On the hard tier v2 fixes 2 of JevK5's misses and breaks
-none (multi-step lookups 15 -> 16, trade-offs 5 -> 6), and its calibration error is less than
-half. Two items of 111 is within noise; the calibration gain is the stronger signal. Dates and
-numbers (7/15) and long policies (11/19) are unchanged and are what more teacher data has to move.
+**Two changes under test.** First, hard mining: JevK5 answers about a quarter of our teacher
+questions wrong and is unsure of another quarter (most often on dates and numbers, probability and
+long policies); v4 trains on those, 3 epochs at lr 3e-5. Second, document length: JevBench's hard
+documents reach ~3,700 tokens (a quarter are over 2,000), while ours stopped at ~1,400. Three pods
+now write 1,500-2,800-word documents, and training accepts 6,144 tokens; v5 includes them.
 
 ## Credits
 
 Training scripts and runtime from [JevK5](https://github.com/allebee/jevk5) (Apache-2.0; see
 `LICENSE-jevk5` and `NOTICE-jevk5`), whose one-pass readout and prompt come from
-[SemIf](https://github.com/TheoLeeCJ/SemIf) (MIT). Base model Qwen3.5-4B by the Qwen team
-(Apache-2.0). Evaluated with JevBench (MIT).
+[SemIf](https://github.com/TheoLeeCJ/SemIf) (MIT). Base model Qwen3.5-4B and teacher Qwen3.8-27B by
+the Qwen team (Apache-2.0). Evaluated with [JevBench](https://github.com/fstandhartinger/jevbench) (MIT).
+
+Licence: Apache-2.0 (`LICENSE`, `NOTICE`).

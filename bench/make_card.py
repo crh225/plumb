@@ -1,7 +1,7 @@
 """Write the submission documents for one trained round: system card, Hugging Face model card, and
 the JevBench issue text, all filled in from that round's own files.
 
-    python bench/make_card.py v4 --hf-repo <user>/jevy-4b [--revision <sha>] [--name "Jevy 4B"]
+    python bench/make_card.py v4 --hf-repo <user>/plumb-4b [--revision <sha>] [--name "Plumb-4B"]
 
 Reads results/jevy-<round>/card-stats.json (run bench/stats.py first), results/<round>-train.log,
 models/jevy-<round>/jevk5_config.json and data/gate-<round>/. Writes bench/out/<round>/SUBMISSION.md,
@@ -23,9 +23,9 @@ def lines(path: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("round")
-    parser.add_argument("--hf-repo", default="<hf-user>/jevy-4b")
+    parser.add_argument("--hf-repo", default="<hf-user>/plumb-4b")
     parser.add_argument("--revision", default="<hub revision sha>")
-    parser.add_argument("--name", default="Jevy 4B")
+    parser.add_argument("--name", default="Plumb-4B")
     parser.add_argument("--repo", default="<public code repo>")
     args = parser.parse_args()
     r = args.round

@@ -1,0 +1,16 @@
+jevy (Plumb-4B)
+Copyright 2026 Christopher House
+
+This product includes software and model weights developed by others:
+
+- JevK5 v0.2 (starting weights, training scripts, runtime and JevBench adapter), by the JevK5
+  authors (github.com/allebee, huggingface.co/alibiserikbay), Apache License 2.0. Its own notice
+  is kept in NOTICE-jevk5.
+
+- Qwen3.5-4B (base weights) and Qwen3.8-27B (teacher), by the Qwen team, Apache License 2.0.
+
+- The decision prompt and the one-pass readout, adapted by JevK5 from SemIf by TheoLeeCJ
+  (https://github.com/TheoLeeCJ/SemIf), MIT License.
+
+- Public datasets used as replay (MNLI, WANLI, BoolQ, banking77, ARC, CommonsenseQA, MMLU-Pro),
+  under their own licences.
