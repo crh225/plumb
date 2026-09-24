@@ -19,22 +19,24 @@ machine.
 | v1 | 0 (public datasets only) | 1.000 | 0.972 | 0.694 | 0.095 | |
 | v2 | 495 | 1.000 | 0.972 | 0.757 | 0.034 | 0.824 |
 | v3 | 909 | 1.000 | 0.972 | 0.739 | 0.070 | 0.834 |
+| **v4** (hard-mined, trained harder) | 2,541 | 1.000 | 0.972 | **0.775** | **0.051** | **0.844** |
 
 The held-out check is our own: teacher questions from domains training never sees, held-out splits
 of the public datasets, and a hand-written hard set. Models are chosen on it, never on JevBench.
 
-So far the held-out check improves steadily, but the public hard tier barely moves: v2 is two items
-of 111 ahead of the starting point, and v3 is level with it. Per family, dates and numbers, long
-policies, judging and probability haven't changed. The rounds in progress test two likely reasons
-(see Log): training too gently on questions the model already answers, and documents much shorter
-than the benchmark's.
+v2 and v3 improved the held-out check but barely moved the public hard tier. v4, trained harder on
+the questions the starting model gets wrong or is unsure of, is the first to move it: 86 of 111
+against 82 (9 items fixed, 5 broken), with long policies 11 -> 13, probability 7 -> 9, dates and
+numbers 7 -> 8 and trade-offs 5 -> 6, while multi-step lookups slipped 15 -> 13. Its hard-tier
+calibration error is 0.051 against 0.077. v5 adds JevBench-length documents (see Log).
 
 JevBench's official score also includes a private sealed set that only its maintainer runs.
 
 ## Model card
 
 Each scored round gets a system card, a Hugging Face model card and a JevBench submission draft,
-generated from its own results into [`bench/out/<round>/`](bench/out/). The first is v4's.
+generated from its own results into [`bench/out/<round>/`](bench/out/). Current:
+[v4 model card](bench/out/v4/MODEL_CARD.md), [system card](bench/out/v4/SUBMISSION.md).
 
 ## Rules
 
@@ -96,12 +98,13 @@ to 170.
 2e-5. The held-out check rises (0.812, 0.824, 0.834), but the public hard tier stays at 0.739-0.757
 and its families don't move.
 
-**Two changes under test.** First, hard mining: the starting model answers about a quarter of our
+**v4: hard mining works.** First, hard mining: the starting model answers about a quarter of our
 teacher questions wrong and is unsure of another quarter (most often on dates and numbers,
 probability and long policies); v4 trains on those, 3 epochs at lr 3e-5. Second, document length:
 JevBench's hard documents reach ~3,700 tokens (a quarter are over 2,000), while ours stopped at
 ~1,400. Three pods now write 1,500-2,800-word documents, and training accepts 6,144 tokens; v5
-includes them.
+includes them. v4 (2,541 teacher questions, hard-mined to 1,619 plus as much replay, 3 epochs at
+3e-5, temperature 1.95) reached 0.844 on the held-out check and 0.775 on the public hard tier.
 
 ## Credits and licence
 
