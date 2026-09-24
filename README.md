@@ -31,6 +31,11 @@ than the benchmark's.
 
 JevBench's official score also includes a private sealed set that only its maintainer runs.
 
+## Model card
+
+Each scored round gets a system card, a Hugging Face model card and a JevBench submission draft,
+generated from its own results into [`bench/out/<round>/`](bench/out/). The first is v4's.
+
 ## Rules
 
 - **No JevBench item, public or held out, is trained on, tuned on, or used to pick a model or a
