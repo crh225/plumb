@@ -23,10 +23,10 @@ def lines(path: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("round")
-    parser.add_argument("--hf-repo", default="<hf-user>/plumb-4b")
+    parser.add_argument("--hf-repo", default="crh225/plumb-4b")
     parser.add_argument("--revision", default="<hub revision sha>")
     parser.add_argument("--name", default="Plumb-4B")
-    parser.add_argument("--repo", default="<public code repo>")
+    parser.add_argument("--repo", default="https://github.com/crh225/jevy")
     args = parser.parse_args()
     r = args.round
     stats = json.loads(Path(f"results/jevy-{r}/card-stats.json").read_text(encoding="utf-8"))
