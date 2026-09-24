@@ -10,4 +10,3 @@ results/*.log
 results/dashboard-history.json
 runpod-env.sh
 h100-env.sh
-bench/out/
