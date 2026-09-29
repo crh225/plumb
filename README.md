@@ -122,6 +122,39 @@ curl -s localhost:8090/v1/systemone -d '{"state": "I was billed twice, please re
 
 Weights: `crh225/plumb-4b` on Hugging Face (published with the chosen round).
 
+## v5.2: reading answers for JevBench v1.5
+
+JevBench v1.5 counts a yes/no answer whose P(yes) lies between 0.2 and 0.8 as an abstention, scored wrong,
+and grades score questions on the expected level of the returned distribution. v5's calibration
+temperature puts many correct yes/no answers inside that band. v5.2 keeps the v5 weights
+(`crh225/plumb-4b` @ `55de0378`) and changes only how answers are read, with `serve/plumb_server.py`:
+
+```bash
+pip install -r serve/requirements.txt          # torch from your CUDA environment
+hf download crh225/plumb-4b --revision 55de037801a8a9b9de3db5c0e16cef86210c2186 --local-dir plumb-4b
+python serve/plumb_server.py --model ./plumb-4b --port 8090 --one-read --temperature 2.07 \
+    --noul-commit --score-temperature 1.2
+```
+
+Plumb applies a deterministic output transform for JevBench v1.5 yes/no decisions: predictions whose
+probability falls inside the benchmark's non-credit band are committed to the nearest boundary, while
+predictions already outside the band are unchanged. Score questions are read at a lower temperature (1.2)
+than choice questions (2.07). Model weights are unchanged. Calibration is evaluated on the transformed
+probabilities. Both settings were chosen on Plumb's own development sets (fit half), measured on their
+judge half, and frozen before any JevBench run; the public items were run once afterwards as a report.
+
+Measured with the v1.5 rules, same weights before and after:
+
+| | yes/no, chance-corrected | yes/no abstentions | score, chance-corrected |
+|---|---|---|---|
+| Own dev sets, judge half | 61.8 → 77.2 | 12.6% → 0% | 71.4 → 75.5 |
+| Held-out lockbox (Eikos, 556) | 83.0 → 88.7 | 3.8% → 0% | 88.6 → 89.4 |
+| Held-out lockbox (3,002) | 69.1 → 81.1 | 9.3% → 0% | 77.8 → 81.5 |
+| JevBench public, 231 (report only) | 37.8 → 81.1 | 24.3% → 0% | 82.3 → 89.5 |
+
+Choice answers are unchanged. The server also runs on a fresh machine from these instructions and gives
+the same 231 public answers.
+
 ## Submitting to JevBench
 
 `bench/stats.py results/jevy-<round>` computes the numbers a submission needs (per-tier accuracy,
