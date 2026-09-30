@@ -122,6 +122,36 @@ curl -s localhost:8090/v1/systemone -d '{"state": "I was billed twice, please re
 
 Weights: `crh225/plumb-4b` on Hugging Face (published with the chosen round).
 
+**With Ollama** (0.35 or later), through Ollama's decision endpoint `/v1/systemone`:
+
+```bash
+ollama pull crh225/plumb-4b
+curl http://localhost:11434/v1/systemone -d '{"model": "crh225/plumb-4b",
+  "state": "I was billed twice, please refund",
+  "questions": {"refund": {"type": "noul", "instructions": "Asks for money back?"}}}'
+```
+
+Ollama builds its own prompt for decision models: the state and every question as a JSON schema, yes/no listed
+false first, and probabilities returned without a temperature. The Ollama build ([ollama.com/crh225/plumb-4b](https://ollama.com/crh225/plumb-4b))
+is therefore its own configuration:
+
+- v5 plus a small LoRA trained on v5's own training data rewritten in Ollama's prompt format;
+- a calibration temperature of 1.75, fitted on held-out data, built into a separate output layer so the
+  probabilities Ollama returns are calibrated as they are;
+- quantized to Q8_0 (5.2 GB).
+
+Measured through Ollama's endpoint on 2,309 of our own held-out and fresh questions (none from JevBench), against
+v5 on its own server:
+
+| Question type | Questions | Accuracy, Plumb server | Accuracy, Ollama build | ECE, Plumb server | ECE, Ollama build |
+|---|---:|---:|---:|---:|---:|
+| Choice | 1,218 | 0.703 | 0.723 | 0.034 | 0.033 |
+| Yes/no | 905 | 0.839 | 0.828 | 0.039 | 0.038 |
+| Score | 186 | 0.758 | 0.785 | 0.084 | 0.056 |
+
+One question per request took 145 ms at the median on an RTX 4080 Super. Plumb's JevBench results were measured
+with its own server and do not carry over to the Ollama build, which also does not apply v5.2's yes/no adjustment.
+
 ## v5.2: reading answers for JevBench v1.5
 
 JevBench v1.5 counts a yes/no answer whose P(yes) lies between 0.2 and 0.8 as an abstention, scored wrong,
